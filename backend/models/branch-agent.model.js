@@ -10,7 +10,7 @@ const schema = new mongoose.Schema({
   languages: { type: [String], default: [] },
   instructions: { type: String, default: '' },
   ai_model_id: { type: mongoose.Schema.Types.ObjectId, ref: 'AIModel', default: null },
-  allowed_tools: { type: [String], default: ['branch_info', 'knowledge_search', 'request_human'] },
+  allowed_tools: { type: [String], default: ['branch_info', 'knowledge_search', 'external_records', 'request_human'] },
   max_steps: { type: Number, default: 8, min: 1, max: 25 },
   handoff_enabled: { type: Boolean, default: true },
   handoff_message: { type: String, default: 'Voy a comunicarte con una persona de esta sucursal.' },
