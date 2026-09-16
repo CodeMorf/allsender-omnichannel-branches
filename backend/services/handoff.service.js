@@ -6,7 +6,16 @@ export class BranchHandoffService {
     this.host = host;
   }
 
+  async assertMember({ workspaceId, branchId, userId }) {
+    const membership = await this.Membership.findOne({ workspace_id: workspaceId, branch_id: branchId, user_id: userId, status: 'active', deleted_at: null }).lean();
+    if (!membership) throw new Error('Agent is not available for this branch');
+    return membership;
+  }
+
   async request({ workspaceId, branchId, conversationKey, language, reason, summary, priority = 'normal', channelContext = {} }) {
+    const existing = await this.Handoff.findOne({ workspace_id: workspaceId, conversation_key: conversationKey, status: { $in: ['waiting', 'claimed'] } }).sort({ created_at: -1 });
+    if (existing) return existing;
+
     const handoff = await this.Handoff.create({ workspace_id: workspaceId, branch_id: branchId, conversation_key: conversationKey, language, reason, summary, priority, channel_context: channelContext, status: 'waiting' });
     await this.ConversationState.findOneAndUpdate(
       { workspace_id: workspaceId, conversation_key: conversationKey },
@@ -16,7 +25,8 @@ export class BranchHandoffService {
     return handoff;
   }
 
-  async queue({ workspaceId, branchId, language = null }) {
+  async queue({ workspaceId, branchId, language = null, viewerUserId = null, requireMembership = false }) {
+    if (requireMembership) await this.assertMember({ workspaceId, branchId, userId: viewerUserId });
     const query = { workspace_id: workspaceId, branch_id: branchId, status: 'waiting' };
     const handoffs = await this.Handoff.find(query).sort({ created_at: 1 }).lean();
     if (!language) return handoffs;
@@ -26,8 +36,8 @@ export class BranchHandoffService {
   async claim({ workspaceId, handoffId, userId }) {
     const handoff = await this.Handoff.findOne({ _id: handoffId, workspace_id: workspaceId, status: 'waiting' }).lean();
     if (!handoff) return { claimed: false, reason: 'already_claimed_or_unavailable' };
-    const membership = await this.Membership.findOne({ workspace_id: workspaceId, branch_id: handoff.branch_id, user_id: userId, status: 'active', deleted_at: null }).lean();
-    if (!membership || membership.availability === 'offline') throw new Error('Agent is not available for this branch');
+    const membership = await this.assertMember({ workspaceId, branchId: handoff.branch_id, userId });
+    if (membership.availability === 'offline' || membership.availability === 'away') throw new Error('Agent is not available for this branch');
 
     const claimed = await this.Handoff.findOneAndUpdate(
       { _id: handoffId, workspace_id: workspaceId, status: 'waiting', claimed_by: null },
@@ -38,7 +48,7 @@ export class BranchHandoffService {
 
     await this.ConversationState.findOneAndUpdate(
       { workspace_id: workspaceId, conversation_key: claimed.conversation_key },
-      { $set: { responder_type: 'HUMAN', responder_id: String(userId), responder_since: new Date() } }
+      { $set: { responder_type: 'HUMAN', responder_id: String(userId), responder_since: new Date(), processing_lock_token: null, processing_lock_until: null } }
     );
     await this.host.assignExistingChat?.({ workspaceId, userId, channelContext: claimed.channel_context });
     return { claimed: true, handoff: claimed };
