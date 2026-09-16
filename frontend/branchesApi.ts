@@ -1,4 +1,4 @@
-import type { ApiResponse, Branch, BranchAgent, BranchHandoff, BranchIntegration, BranchKnowledge, BranchMember, BranchResolveInput } from './types';
+import type { Branch, BranchAgent, BranchApiKeyInfo, BranchHandoff, BranchIntegration, BranchKnowledge, BranchMember, BranchResolveInput } from './types';
 
 export interface BranchesApiOptions { baseUrl?: string; workspaceId: () => string | null; fetcher?: typeof fetch; getAuthHeaders?: () => Record<string,string>; }
 
@@ -34,8 +34,8 @@ export function createBranchesApi(options: BranchesApiOptions) {
     importOpenApi: (id: string, input: unknown) => request<BranchIntegration>(`/${id}/integrations/import-openapi`, { method: 'POST', body: JSON.stringify(input) }),
     handoffs: (id: string, language?: string) => request<BranchHandoff[]>(`/${id}/handoffs${language ? `?language=${encodeURIComponent(language)}` : ''}`),
     claim: (handoffId: string) => request<unknown>(`/handoffs/${handoffId}/claim`, { method: 'POST', body: '{}' }),
-    apiKeys: (id: string) => request<Array<Record<string,unknown>>>(`/${id}/api-keys`),
-    createApiKey: (id: string, input: { name?: string; scopes: string[]; expires_at?: string|null }) => request<Record<string,unknown>>(`/${id}/api-keys`, { method: 'POST', body: JSON.stringify(input) })
+    apiKeys: (id: string) => request<BranchApiKeyInfo[]>(`/${id}/api-keys`),
+    createApiKey: (id: string, input: { name?: string; scopes: string[]; expires_at?: string|null; ip_allowlist?: string[]; rate_limit_per_minute?: number }) => request<BranchApiKeyInfo & { key: string }>(`/${id}/api-keys`, { method: 'POST', body: JSON.stringify(input) })
   };
 }
 
