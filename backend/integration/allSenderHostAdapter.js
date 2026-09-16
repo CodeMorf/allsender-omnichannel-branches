@@ -18,31 +18,49 @@ export function createAllSenderBranchesHostAdapter({ models, encryptIntegrationS
     const workspace = await Workspace.findOne({ _id: workspaceId, user_id: ownerId, deleted_at: null, is_active: { $ne: false } }).select('_id').lean();
     return workspace?._id || null;
   };
+
   const getOwnerId = async (workspaceId) => {
     const workspace = await Workspace.findOne({ _id: toObjectId(workspaceId), deleted_at: null, is_active: { $ne: false } }).select('user_id').lean();
     if (!workspace?.user_id) throw new Error('Workspace owner context is required');
     return workspace.user_id;
   };
+
   const validateUser = async ({ workspaceId, userId }) => {
     const ownerId = await getOwnerId(workspaceId);
-    const user = await User.findOne({ _id: toObjectId(userId), created_by: ownerId, deleted_at: null, status: { $ne: false } }).select('_id').lean();
+    const targetId = toObjectId(userId);
+    if (!targetId) throw new Error('Agent is not available in this workspace');
+    const user = await User.findOne({
+      _id: targetId,
+      deleted_at: null,
+      $or: [{ _id: ownerId }, { created_by: ownerId }]
+    }).select('_id').lean();
     if (!user) throw new Error('Agent is not available in this workspace');
     return user;
   };
+
   const resolveCustomerAI = async ({ workspaceId, modelId = null }) => {
     const ownerId = await getOwnerId(workspaceId);
     const settings = await UserSetting.findOne({ user_id: ownerId }).select('ai_model api_key').lean();
-    const selectedModelId = modelId || settings?.ai_model;
-    if (!selectedModelId) throw new Error('Select an AI model in AllSender settings before enabling the branch agent');
+    if (!settings?.ai_model) throw new Error('Select an AI model in AllSender settings before enabling the branch agent');
     if (!settings?.api_key) throw new Error('Add the customer AI API key in AllSender settings before enabling the branch agent');
-    const model = await AIModel.findOne({ _id: toObjectId(selectedModelId), status: 'active', deleted_at: null }).lean();
+    if (modelId && String(modelId) !== String(settings.ai_model)) {
+      throw new Error('Branch agent model must use the AI model configured in AllSender settings');
+    }
+    const model = await AIModel.findOne({ _id: toObjectId(settings.ai_model), status: 'active', deleted_at: null }).lean();
     if (!model) throw new Error('The configured AI model is not available');
     return { model, apiKey: settings.api_key };
   };
-  const resolveExistingConversationOwner = async ({ channelContext = {} }) => {
+
+  const resolveExistingConversationOwner = async ({ workspaceId, channelContext = {} }) => {
+    const ownerId = await getOwnerId(workspaceId);
     const { sender_number, receiver_number, whatsapp_phone_number_id } = channelContext;
     if (!sender_number || !whatsapp_phone_number_id) return null;
-    const query = { sender_number, whatsapp_phone_number_id: toObjectId(whatsapp_phone_number_id) || whatsapp_phone_number_id, status: 'assigned' };
+    const query = {
+      sender_number,
+      whatsapp_phone_number_id: toObjectId(whatsapp_phone_number_id) || whatsapp_phone_number_id,
+      assigned_by: ownerId,
+      status: 'assigned'
+    };
     if (receiver_number) query.receiver_number = receiver_number;
     const assignment = await ChatAssignment.findOne(query).select('agent_id chatbot_id chatbot_expires_at').lean();
     if (!assignment) return null;
@@ -51,33 +69,38 @@ export function createAllSenderBranchesHostAdapter({ models, encryptIntegrationS
     if (assignment.agent_id) return { type: 'HUMAN', id: String(assignment.agent_id) };
     return null;
   };
+
   const assignExistingChat = async ({ workspaceId, userId, channelContext = {} }) => {
     await validateUser({ workspaceId, userId });
     const ownerId = await getOwnerId(workspaceId);
     const { sender_number, receiver_number, whatsapp_phone_number_id } = channelContext;
     if (!sender_number || !receiver_number || !whatsapp_phone_number_id) return { assigned: false, reason: 'channel_assignment_context_missing' };
     const assignment = await ChatAssignment.findOneAndUpdate(
-      { sender_number, receiver_number, whatsapp_phone_number_id },
+      { sender_number, receiver_number, whatsapp_phone_number_id, assigned_by: ownerId },
       { $set: { agent_id: userId, assigned_by: ownerId, status: 'assigned', is_solved: false, chatbot_id: null, chatbot_expires_at: null } },
       { new: true, upsert: true, setDefaultsOnInsert: true }
     ).lean();
     return { assigned: true, assignment };
   };
+
   const encodeIntegrationSecret = async (plainText) => {
     if (!plainText) return null;
     if (!encryptSecret) throw new Error('Configure integration encryption before saving credentials');
     return encryptSecret(plainText);
   };
+
   const resolveIntegrationAuth = async (integration) => {
     if (integration.auth_type === 'none') return { headers: {} };
+    if (integration.auth_type === 'oauth') throw new Error('OAuth integration is not enabled for this connector yet');
     if (!decryptSecret || !integration.encrypted_secret) throw new Error('Integration credentials are unavailable');
     const secret = await decryptSecret(integration.encrypted_secret, integration);
     switch (integration.auth_type) {
       case 'bearer': return { headers: { Authorization: `Bearer ${secret}` } };
       case 'api_key': return { headers: { [integration.auth_meta?.header || 'X-API-Key']: secret } };
       case 'basic': return { headers: { Authorization: `Basic ${secret}` } };
-      default: return { headers: {} };
+      default: throw new Error('Integration authentication type is not supported');
     }
   };
+
   return { resolveWorkspaceId, getOwnerId, validateUser, resolveCustomerAI, resolveExistingConversationOwner, assignExistingChat, encodeIntegrationSecret, resolveIntegrationAuth };
 }
