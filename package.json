@@ -1,6 +1,6 @@
 {
   "name": "@allsender/omnichannel-branches",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": false,
   "description": "Workspace-scoped branches, geolocation routing, autonomous conversational AI and human handoff for AllSender Omnichannel.",
   "type": "module",
@@ -11,7 +11,7 @@
     "./frontend": "./frontend/branchesApi.ts"
   },
   "scripts": {
-    "check": "node --check backend/index.js && node --check backend/services/branch.service.js && node --check backend/services/geo.service.js && node --check backend/services/branch-resolver.service.js && node --check backend/services/agent-runtime.service.js && node --check backend/services/handoff.service.js && node --check backend/routes/branch.routes.js && node --check backend/routes/branch-public.routes.js && node --check backend/integration/allSenderHostAdapter.js",
+    "check": "node scripts/check-js.mjs",
     "typecheck": "tsc --noEmit",
     "test": "node --test",
     "validate": "npm run check && npm run typecheck && npm test"
