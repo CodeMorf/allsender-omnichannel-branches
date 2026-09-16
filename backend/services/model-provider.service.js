@@ -4,6 +4,7 @@ import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createGroq } from '@ai-sdk/groq';
 import { createMistral } from '@ai-sdk/mistral';
 import { createXai } from '@ai-sdk/xai';
+import { createCohere } from '@ai-sdk/cohere';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 
 const cleanBaseUrl = (endpoint) => {
@@ -34,11 +35,15 @@ export function createVoltModel({ model, apiKey }) {
       return createMistral({ apiKey, ...(baseURL ? { baseURL } : {}) })(model.model_id);
     case 'xai':
       return createXai({ apiKey, ...(baseURL ? { baseURL } : {}) })(model.model_id);
-    case 'deepseek':
     case 'cohere':
+      return createCohere({ apiKey, ...(baseURL ? { baseURL } : {}) })(model.model_id);
+    case 'deepseek': {
+      const compatible = createOpenAICompatible({ name: 'deepseek', apiKey, baseURL: baseURL || 'https://api.deepseek.com' });
+      return compatible(model.model_id);
+    }
     case 'custom': {
-      if (!baseURL) throw new Error('Custom/OpenAI-compatible model requires api_endpoint');
-      const compatible = createOpenAICompatible({ name: provider || 'custom', apiKey, baseURL });
+      if (!baseURL) throw new Error('Custom model requires an OpenAI-compatible api_endpoint');
+      const compatible = createOpenAICompatible({ name: 'custom', apiKey, baseURL });
       return compatible(model.model_id);
     }
     default:
