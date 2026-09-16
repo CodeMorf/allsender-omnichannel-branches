@@ -10,6 +10,8 @@ const schema = new mongoose.Schema({
   responder_type: { type: String, enum: ['NONE', 'LEGACY_AUTOMATION', 'AI', 'WAITING_HUMAN', 'HUMAN'], default: 'NONE', index: true },
   responder_id: { type: String, default: null },
   responder_since: { type: Date, default: null },
+  processing_lock_token: { type: String, default: null },
+  processing_lock_until: { type: Date, default: null, index: true },
   summary: { type: String, default: '' },
   recent_messages: { type: [{ role: String, content: String, at: Date }], default: [] },
   related_order: { type: String, default: null },
