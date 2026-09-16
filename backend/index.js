@@ -21,7 +21,7 @@ import openApiImportService from './services/openapi.service.js';
 import { createBranchRouter } from './routes/branch.routes.js';
 import { createBranchPublicRouter } from './routes/branch-public.routes.js';
 
-export function createBranchesModule({ host }) {
+export function createBranchesModule({ host, checkPermission = null }) {
   if (!host?.resolveWorkspaceId) throw new Error('Branches module requires a host adapter');
   const models = { Branch, Membership, BranchAgent, Knowledge, Integration, ConversationState, Handoff, BranchApiKey, ExternalRecord };
   const branchService = new BranchService({ Branch, Membership, BranchAgent, Knowledge, Integration, BranchApiKey, host });
@@ -37,7 +37,7 @@ export function createBranchesModule({ host }) {
     try { const workspaceId = await host.resolveWorkspaceId(req); if (!workspaceId) return res.status(403).json({ success: false, message: 'Selecciona un espacio de trabajo válido.' }); req.branchWorkspaceId = workspaceId; return next(); }
     catch (error) { console.error('[branches:workspace]', error); return res.status(403).json({ success: false, message: 'No se pudo validar el espacio de trabajo.' }); }
   };
-  const router = createBranchRouter({ branchService, resolver, agentRuntime, handoffService, apiKeyService, externalRecordService, openApiImportService, host });
+  const router = createBranchRouter({ branchService, resolver, agentRuntime, handoffService, apiKeyService, externalRecordService, openApiImportService, host, checkPermission });
   const publicRouter = createBranchPublicRouter({ apiKeyService, externalRecordService, Branch, Knowledge });
   return { models, services: { branchService, geoService, resolver, conversationControl, integrationService, handoffService, apiKeyService, externalRecordService, agentRuntime, inboundOrchestrator, openApiImportService }, workspaceMiddleware, router, publicRouter };
 }
