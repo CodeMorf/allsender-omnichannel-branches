@@ -41,8 +41,9 @@ export class BranchGeoService {
   findBestBranch(branches, location) {
     const ranked = this.rankByLocation(branches, location);
     if (!ranked.length) return null;
-    const inside = ranked.find((item) => item.inside);
-    return inside || ranked[0];
+    // Never force a customer into a radius/polygon branch when the shared location is outside coverage.
+    // Branches with coverage_mode="none" are considered inside by containsLocation().
+    return ranked.find((item) => item.inside) || null;
   }
 }
 

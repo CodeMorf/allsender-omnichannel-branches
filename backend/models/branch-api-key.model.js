@@ -7,8 +7,11 @@ const schema = new mongoose.Schema({
   prefix: { type: String, required: true, index: true },
   key_hash: { type: String, required: true, unique: true },
   scopes: { type: [String], default: ['branch.read'] },
+  ip_allowlist: { type: [String], default: [] },
+  rate_limit_per_minute: { type: Number, default: 120, min: 1, max: 10000 },
   expires_at: { type: Date, default: null },
   last_used_at: { type: Date, default: null },
+  last_used_ip: { type: String, default: null },
   revoked_at: { type: Date, default: null },
   created_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null }
 }, { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }, collection: 'omnichannel_branch_api_keys' });
