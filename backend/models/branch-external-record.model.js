@@ -5,6 +5,12 @@ const schema = new mongoose.Schema({
   branch_id: { type: mongoose.Schema.Types.ObjectId, ref: 'OmnichannelBranch', required: true, index: true },
   type: { type: String, enum: ['order', 'tracking', 'customer', 'inventory', 'reservation', 'custom'], required: true, index: true },
   external_id: { type: String, required: true, trim: true, index: true },
+  access_mode: { type: String, enum: ['customer_bound', 'public'], default: 'customer_bound' },
+  customer_refs: {
+    contact_id: { type: String, default: null },
+    phone: { type: String, default: null },
+    email: { type: String, default: null }
+  },
   payload: { type: mongoose.Schema.Types.Mixed, default: {} },
   external_updated_at: { type: Date, default: null },
   source: { type: String, default: 'branch_api' },
@@ -13,5 +19,7 @@ const schema = new mongoose.Schema({
 
 schema.index({ workspace_id: 1, branch_id: 1, type: 1, external_id: 1, deleted_at: 1 }, { unique: true });
 schema.index({ workspace_id: 1, branch_id: 1, type: 1, updated_at: -1 });
+schema.index({ workspace_id: 1, branch_id: 1, 'customer_refs.contact_id': 1 });
+schema.index({ workspace_id: 1, branch_id: 1, 'customer_refs.phone': 1 });
 
 export default mongoose.models.OmnichannelBranchExternalRecord || mongoose.model('OmnichannelBranchExternalRecord', schema);
