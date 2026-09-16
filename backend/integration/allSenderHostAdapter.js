@@ -39,6 +39,18 @@ export function createAllSenderBranchesHostAdapter({ models, encryptIntegrationS
     if (!model) throw new Error('The configured AI model is not available');
     return { model, apiKey: settings.api_key };
   };
+  const resolveExistingConversationOwner = async ({ channelContext = {} }) => {
+    const { sender_number, receiver_number, whatsapp_phone_number_id } = channelContext;
+    if (!sender_number || !whatsapp_phone_number_id) return null;
+    const query = { sender_number, whatsapp_phone_number_id: toObjectId(whatsapp_phone_number_id) || whatsapp_phone_number_id, status: 'assigned' };
+    if (receiver_number) query.receiver_number = receiver_number;
+    const assignment = await ChatAssignment.findOne(query).select('agent_id chatbot_id chatbot_expires_at').lean();
+    if (!assignment) return null;
+    const chatbotActive = assignment.chatbot_id && (!assignment.chatbot_expires_at || new Date(assignment.chatbot_expires_at) > new Date());
+    if (chatbotActive) return { type: 'LEGACY_AUTOMATION', id: String(assignment.chatbot_id) };
+    if (assignment.agent_id) return { type: 'HUMAN', id: String(assignment.agent_id) };
+    return null;
+  };
   const assignExistingChat = async ({ workspaceId, userId, channelContext = {} }) => {
     await validateUser({ workspaceId, userId });
     const ownerId = await getOwnerId(workspaceId);
@@ -67,5 +79,5 @@ export function createAllSenderBranchesHostAdapter({ models, encryptIntegrationS
       default: return { headers: {} };
     }
   };
-  return { resolveWorkspaceId, getOwnerId, validateUser, resolveCustomerAI, assignExistingChat, encodeIntegrationSecret, resolveIntegrationAuth };
+  return { resolveWorkspaceId, getOwnerId, validateUser, resolveCustomerAI, resolveExistingConversationOwner, assignExistingChat, encodeIntegrationSecret, resolveIntegrationAuth };
 }

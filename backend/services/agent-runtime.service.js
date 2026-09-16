@@ -43,12 +43,25 @@ export class BranchAgentRuntime {
   async respond({ workspaceId, branchId, conversationKey, message, language = null, agentId = null, channelContext = {}, metadata = {} }) {
     const branch = await this.models.Branch.findOne({ _id: branchId, workspace_id: workspaceId, status: 'active', deleted_at: null }).lean();
     if (!branch) throw new Error('Branch is not available');
+    if (branch.response_policy === 'human_only' || branch.response_policy === 'legacy_only') {
+      return { sent: false, blocked: true, reason: branch.response_policy };
+    }
+
+    if (this.host.resolveExistingConversationOwner) {
+      const existingOwner = await this.host.resolveExistingConversationOwner({ workspaceId, channelContext });
+      if (existingOwner) {
+        await this.conversationControl.transfer({ workspaceId, conversationKey, toType: existingOwner.type, responderId: existingOwner.id });
+        return { sent: false, blocked: true, reason: existingOwner.type === 'HUMAN' ? 'human_already_assigned' : 'legacy_chatbot_active' };
+      }
+    }
+
     const agentQuery = { workspace_id: workspaceId, branch_id: branchId, status: 'active', deleted_at: null }; if (agentId) agentQuery._id = agentId;
     const branchAgent = await this.models.BranchAgent.findOne(agentQuery).sort({ priority: 1, created_at: 1 }).lean();
     if (!branchAgent) throw new Error('No active autonomous agent is configured for this branch');
     if (branchAgent.mode !== 'autonomous') throw new Error('The selected branch agent is configured as copilot only');
     const lock = await this.conversationControl.acquire({ workspaceId, conversationKey, responderType: 'AI', responderId: branchAgent._id });
     if (!lock) return { sent: false, blocked: true, reason: 'conversation_owned_by_another_responder' };
+
     const aiConfig = await this.host.resolveCustomerAI({ workspaceId, modelId: branchAgent.ai_model_id });
     const voltModel = createVoltModel(aiConfig); const currentLanguage = language || lock.language || branch.default_language || null;
     const customerContext = { contact_id: metadata?.contact_id || metadata?.contactId || null, phone: metadata?.phone || metadata?.customer_phone || null, email: metadata?.email || metadata?.customer_email || null };
@@ -59,7 +72,7 @@ export class BranchAgentRuntime {
     const prompt = [history ? `Recent conversation:\n${history}` : '', `Customer context: ${JSON.stringify(customerContext)}`, `Customer: ${message}`].filter(Boolean).join('\n\n');
     const result = await agent.generateText(prompt, { maxSteps: branchAgent.max_steps || 8 });
     const text = String(result?.text || '').trim(); const latest = await this.models.ConversationState.findOne({ workspace_id: workspaceId, conversation_key: conversationKey }).lean(); const now = new Date();
-    await this.models.ConversationState.findOneAndUpdate({ workspace_id: workspaceId, conversation_key: conversationKey }, { $set: { language: currentLanguage, branch_id: branchId }, $push: { recent_messages: { $each: [{ role: 'customer', content: String(message), at: now }, ...(text ? [{ role: 'assistant', content: text, at: now }] : [])], $slice: -20 } } }, { upsert: true });
+    await this.models.ConversationState.findOneAndUpdate({ workspace_id: workspaceId, conversation_key: conversationKey }, { $set: { language: currentLanguage, branch_id: branchId }, $push: { recent_messages: { $each: [{ role: 'customer', content: String(message), at: now }, ...(text ? [{ role: 'assistant', content: text, at: now }] : [])], $slice: -20 } } }, { upsert: true, setDefaultsOnInsert: true });
     return { sent: Boolean(text), blocked: false, text, branch: publicBranch(branch), agent: { id: String(branchAgent._id), name: branchAgent.name }, responder_type: latest?.responder_type || 'AI' };
   }
 }

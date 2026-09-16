@@ -16,6 +16,7 @@ import { BranchHandoffService } from './services/handoff.service.js';
 import { BranchApiKeyService } from './services/api-key.service.js';
 import { BranchExternalRecordService } from './services/external-record.service.js';
 import { BranchAgentRuntime } from './services/agent-runtime.service.js';
+import { BranchInboundOrchestrator } from './services/inbound-orchestrator.service.js';
 import openApiImportService from './services/openapi.service.js';
 import { createBranchRouter } from './routes/branch.routes.js';
 import { createBranchPublicRouter } from './routes/branch-public.routes.js';
@@ -31,13 +32,14 @@ export function createBranchesModule({ host }) {
   const apiKeyService = new BranchApiKeyService({ BranchApiKey });
   const externalRecordService = new BranchExternalRecordService({ ExternalRecord });
   const agentRuntime = new BranchAgentRuntime({ models, host, conversationControl, handoffService, integrationService, externalRecordService });
+  const inboundOrchestrator = new BranchInboundOrchestrator({ resolver, agentRuntime });
   const workspaceMiddleware = async (req, res, next) => {
     try { const workspaceId = await host.resolveWorkspaceId(req); if (!workspaceId) return res.status(403).json({ success: false, message: 'Selecciona un espacio de trabajo válido.' }); req.branchWorkspaceId = workspaceId; return next(); }
     catch (error) { console.error('[branches:workspace]', error); return res.status(403).json({ success: false, message: 'No se pudo validar el espacio de trabajo.' }); }
   };
-  const router = createBranchRouter({ branchService, resolver, agentRuntime, handoffService, apiKeyService, externalRecordService, openApiImportService, Integration, host });
+  const router = createBranchRouter({ branchService, resolver, agentRuntime, handoffService, apiKeyService, externalRecordService, openApiImportService, host });
   const publicRouter = createBranchPublicRouter({ apiKeyService, externalRecordService, Branch, Knowledge });
-  return { models, services: { branchService, geoService, resolver, conversationControl, integrationService, handoffService, apiKeyService, externalRecordService, agentRuntime, openApiImportService }, workspaceMiddleware, router, publicRouter };
+  return { models, services: { branchService, geoService, resolver, conversationControl, integrationService, handoffService, apiKeyService, externalRecordService, agentRuntime, inboundOrchestrator, openApiImportService }, workspaceMiddleware, router, publicRouter };
 }
 
 export { Branch, Membership as BranchMembership, BranchAgent, Knowledge as BranchKnowledge, Integration as BranchIntegration, ConversationState as BranchConversationState, Handoff as BranchHandoff, BranchApiKey, ExternalRecord as BranchExternalRecord };

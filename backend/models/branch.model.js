@@ -12,6 +12,7 @@ const branchSchema = new mongoose.Schema({
   description: { type: String, default: '', trim: true },
   status: { type: String, enum: ['active', 'inactive'], default: 'active', index: true },
   is_default: { type: Boolean, default: false },
+  response_policy: { type: String, enum: ['legacy_first', 'ai_first', 'ai_only', 'human_only', 'legacy_only'], default: 'legacy_first' },
   address: {
     country: { type: String, default: '' },
     region: { type: String, default: '' },

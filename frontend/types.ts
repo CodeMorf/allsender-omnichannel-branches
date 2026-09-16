@@ -2,6 +2,7 @@ export type BranchStatus = 'active' | 'inactive';
 export type AssignmentMode = 'manual' | 'first_claim' | 'round_robin' | 'least_load';
 export type CoverageMode = 'none' | 'radius' | 'polygon';
 export type AgentMode = 'autonomous' | 'copilot';
+export type ResponsePolicy = 'legacy_first' | 'ai_first' | 'ai_only' | 'human_only' | 'legacy_only';
 
 export interface Branch {
   _id: string;
@@ -10,6 +11,7 @@ export interface Branch {
   description?: string;
   status: BranchStatus;
   is_default?: boolean;
+  response_policy?: ResponsePolicy;
   address?: { country?: string; region?: string; city?: string; postal_code?: string; address_line?: string };
   location?: { type: 'Point'; coordinates: [number, number] };
   timezone?: string;

@@ -10,7 +10,7 @@ export class BranchService {
     return this.Branch.create({ ...input, workspace_id: workspaceId, code, created_by: actorId });
   }
   async update(workspaceId, branchId, input, actorId = null) {
-    const allowed = ['name','code','description','status','is_default','address','location','timezone','languages','default_language','aliases','phone','email','manager_user_id','coverage_mode','coverage_radius_km','coverage_polygon','channel_bindings','assignment_mode','business_hours_mode','business_hours_id','sort_order'];
+    const allowed = ['name','code','description','status','is_default','response_policy','address','location','timezone','languages','default_language','aliases','phone','email','manager_user_id','coverage_mode','coverage_radius_km','coverage_polygon','channel_bindings','assignment_mode','business_hours_mode','business_hours_id','sort_order'];
     const update = {}; for (const key of allowed) if (input[key] !== undefined) update[key] = key === 'code' ? cleanCode(input[key]) : input[key]; update.updated_by = actorId;
     if (update.is_default) await this.Branch.updateMany({ workspace_id: workspaceId, _id: { $ne: branchId }, deleted_at: null }, { $set: { is_default: false } });
     return this.Branch.findOneAndUpdate({ _id: branchId, workspace_id: workspaceId, deleted_at: null }, { $set: update }, { new: true, runValidators: true }).lean();

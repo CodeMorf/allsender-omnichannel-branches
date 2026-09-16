@@ -7,7 +7,7 @@ export class ConversationControlService {
     return this.ConversationState.findOneAndUpdate(
       { workspace_id: workspaceId, conversation_key: conversationKey },
       { $setOnInsert: { workspace_id: workspaceId, conversation_key: conversationKey, responder_type: 'NONE' } },
-      { new: true, upsert: true }
+      { new: true, upsert: true, setDefaultsOnInsert: true }
     );
   }
 
@@ -19,6 +19,7 @@ export class ConversationControlService {
   }
 
   async acquire({ workspaceId, conversationKey, responderType, responderId = null }) {
+    await this.getOrCreate({ workspaceId, conversationKey });
     return this.ConversationState.findOneAndUpdate(
       {
         workspace_id: workspaceId,
@@ -37,10 +38,11 @@ export class ConversationControlService {
   }
 
   async transfer({ workspaceId, conversationKey, toType, responderId = null }) {
+    await this.getOrCreate({ workspaceId, conversationKey });
     return this.ConversationState.findOneAndUpdate(
       { workspace_id: workspaceId, conversation_key: conversationKey },
       { $set: { responder_type: toType, responder_id: responderId ? String(responderId) : null, responder_since: new Date() } },
-      { new: true, upsert: false }
+      { new: true }
     );
   }
 
