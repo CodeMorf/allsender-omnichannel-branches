@@ -6,9 +6,18 @@ const writeScopeFor = (type) => type === 'order' ? 'branch.orders.write' : type 
 
 export function createBranchPublicRouter({ apiKeyService, externalRecordService, Branch, Knowledge }) {
   const router = express.Router();
+  router.use((req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
   const authorize = (scopeResolver) => async (req, res, next) => {
-    try { const scope = typeof scopeResolver === 'function' ? scopeResolver(req) : scopeResolver; const key = await apiKeyService.authenticate(extractKey(req), scope); if (!key) return res.status(401).json({ success: false, message: 'API key inválida, vencida o sin permisos.' }); req.branchApiKey = key; req.branchWorkspaceId = key.workspace_id; req.branchId = key.branch_id; return next(); }
-    catch (error) { console.error('[branches:public-auth]', error); return res.status(401).json({ success: false, message: 'No se pudo validar la credencial.' }); }
+    try {
+      const scope = typeof scopeResolver === 'function' ? scopeResolver(req) : scopeResolver;
+      const key = await apiKeyService.authenticate(extractKey(req), scope, req.ip || req.socket?.remoteAddress || null);
+      if (!key) return res.status(401).json({ success: false, message: 'API key inválida, vencida, limitada o sin permisos.' });
+      req.branchApiKey = key; req.branchWorkspaceId = key.workspace_id; req.branchId = key.branch_id;
+      return next();
+    } catch (error) {
+      console.error('[branches:public-auth]', error);
+      return res.status(401).json({ success: false, message: 'No se pudo validar la credencial.' });
+    }
   };
   router.get('/profile', authorize('branch.read'), async (req, res) => { const branch = await Branch.findOne({ _id: req.branchId, workspace_id: req.branchWorkspaceId, deleted_at: null, status: 'active' }).select('name code description address location timezone languages default_language phone email coverage_mode status').lean(); if (!branch) return res.status(404).json({ success: false, message: 'Sucursal no disponible.' }); return res.json({ success: true, data: branch }); });
   router.get('/records/:type', authorize((req) => readScopeFor(req.params.type)), async (req, res) => res.json({ success: true, data: await externalRecordService.list({ workspaceId: req.branchWorkspaceId, branchId: req.branchId, type: req.params.type, limit: req.query.limit }) }));
