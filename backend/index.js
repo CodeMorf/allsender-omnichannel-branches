@@ -32,7 +32,7 @@ export function createBranchesModule({ host }) {
   const apiKeyService = new BranchApiKeyService({ BranchApiKey });
   const externalRecordService = new BranchExternalRecordService({ ExternalRecord });
   const agentRuntime = new BranchAgentRuntime({ models, host, conversationControl, handoffService, integrationService, externalRecordService });
-  const inboundOrchestrator = new BranchInboundOrchestrator({ resolver, agentRuntime });
+  const inboundOrchestrator = new BranchInboundOrchestrator({ resolver, agentRuntime, conversationControl });
   const workspaceMiddleware = async (req, res, next) => {
     try { const workspaceId = await host.resolveWorkspaceId(req); if (!workspaceId) return res.status(403).json({ success: false, message: 'Selecciona un espacio de trabajo válido.' }); req.branchWorkspaceId = workspaceId; return next(); }
     catch (error) { console.error('[branches:workspace]', error); return res.status(403).json({ success: false, message: 'No se pudo validar el espacio de trabajo.' }); }
