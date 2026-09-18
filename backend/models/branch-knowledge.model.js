@@ -6,7 +6,7 @@ const schema = new mongoose.Schema({
   scope: { type: String, enum: ['workspace', 'branch'], default: 'branch' },
   type: { type: String, enum: ['text', 'faq', 'url', 'document', 'policy', 'terms', 'service', 'product'], default: 'text' },
   title: { type: String, required: true, trim: true },
-  language: { type: String, default: null },
+  language: { type: String, default: 'es' },
   country: { type: String, default: null },
   version: { type: String, default: null },
   effective_date: { type: Date, default: null },
@@ -18,6 +18,6 @@ const schema = new mongoose.Schema({
 }, { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }, collection: 'omnichannel_branch_knowledge' });
 
 schema.index({ workspace_id: 1, branch_id: 1, status: 1, deleted_at: 1 });
-schema.index({ title: 'text', content: 'text' });
+schema.index({ title: 'text', content: 'text' }, { default_language: 'spanish', language_override: 'none' });
 
 export default mongoose.models.OmnichannelBranchKnowledge || mongoose.model('OmnichannelBranchKnowledge', schema);

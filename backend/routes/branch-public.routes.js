@@ -1,3 +1,15 @@
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const openapiPath = path.resolve(__dirname, '../../openapi.json');
+let openApiSpec = null;
+try {
+  openApiSpec = JSON.parse(fs.readFileSync(openapiPath, 'utf8'));
+} catch (e) {
+  console.warn('[branch-public.routes] Failed to load openapi.json:', e.message);
+}
 import express from 'express';
 
 const extractKey = (req) => { const header = req.headers?.authorization; if (typeof header === 'string' && /^Bearer\s+/i.test(header)) return header.replace(/^Bearer\s+/i, '').trim(); const direct = req.headers?.['x-branch-api-key']; return typeof direct === 'string' ? direct.trim() : null; };
@@ -7,6 +19,10 @@ const writeScopeFor = (type) => type === 'order' ? 'branch.orders.write' : type 
 export function createBranchPublicRouter({ apiKeyService, externalRecordService, Branch, Knowledge }) {
   const router = express.Router();
   router.use((req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
+  router.get('/openapi.json', (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    return res.json(openApiSpec || { error: 'OpenAPI spec not loaded' });
+  });
   const authorize = (scopeResolver) => async (req, res, next) => {
     try {
       const scope = typeof scopeResolver === 'function' ? scopeResolver(req) : scopeResolver;

@@ -38,6 +38,7 @@ const branchSchema = new mongoose.Schema({
   assignment_mode: { type: String, enum: ['manual', 'first_claim', 'round_robin', 'least_load'], default: 'first_claim' },
   business_hours_mode: { type: String, enum: ['inherit', 'custom'], default: 'inherit' },
   business_hours_id: { type: mongoose.Schema.Types.ObjectId, ref: 'WorkingHours', default: null },
+  business_hours: { type: mongoose.Schema.Types.Mixed, default: null },
   sort_order: { type: Number, default: 0 },
   created_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   updated_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },

@@ -1,0 +1,363 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "AllSender Omnichannel Branches — External Branch Data API",
+    "version": "0.2.1",
+    "description": "API pública Machine-to-Machine (M2M) por sucursal de AllSender Omnichannel. Permite a sistemas externos (ERPs, e-commerce, CRM, WMS) sincronizar registros de pedidos, seguimientos (tracking) y consultar o enriquecer la base de conocimiento local de la sucursal. La sucursal se deduce criptográficamente del hash de la API Key suministrada (sin parámetro en URL)."
+  },
+  "servers": [
+    {
+      "url": "https://suite.allsender.tech/api/branch-data",
+      "description": "Servidor de Producción (AllSender Suite)"
+    },
+    {
+      "url": "http://localhost:5000/api/branch-data",
+      "description": "Desarrollo Local"
+    }
+  ],
+  "security": [
+    {
+      "BearerAuth": []
+    },
+    {
+      "ApiKeyAuth": []
+    }
+  ],
+  "paths": {
+    "/openapi.json": {
+      "get": {
+        "summary": "Especificación OpenAPI 3.0",
+        "description": "Devuelve la especificación OpenAPI de la API externa de sucursales en formato JSON. No requiere autenticación.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Especificación OpenAPI viva del módulo en formato JSON.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/profile": {
+      "get": {
+        "summary": "Consultar perfil público de la sucursal",
+        "description": "Obtiene la información pública, ubicación geográfica, dirección, horario y canales de la sucursal deducida de la API Key.",
+        "responses": {
+          "200": {
+            "description": "Ficha pública de la sucursal devuelta exitosamente."
+          },
+          "401": {
+            "description": "API key inválida, expirada o carente del scope 'branch.read'."
+          },
+          "404": {
+            "description": "Sucursal no encontrada o inactiva."
+          }
+        }
+      }
+    },
+    "/records/{type}": {
+      "get": {
+        "summary": "Listar registros externos por tipo",
+        "description": "Lista los registros sincronizados de un tipo dado (ej: order, tracking, data) para esta sucursal.",
+        "parameters": [
+          {
+            "name": "type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Tipo de registro ('order', 'tracking' o genérico)."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 50
+            },
+            "description": "Número máximo de registros a recuperar."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de registros externos encontrados."
+          },
+          "401": {
+            "description": "Scope de lectura insuficiente."
+          }
+        }
+      }
+    },
+    "/records/{type}/{externalId}": {
+      "get": {
+        "summary": "Obtener un registro externo específico",
+        "description": "Recupera los datos de un registro sincronizado a partir de su tipo y su externalId.",
+        "parameters": [
+          {
+            "name": "type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "externalId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Registro externo encontrado."
+          },
+          "404": {
+            "description": "Registro no encontrado para esta sucursal."
+          }
+        }
+      },
+      "put": {
+        "summary": "Crear o actualizar registro externo (idempotente)",
+        "description": "Sincroniza un registro desde un sistema externo (ej: pedido de Shopify/SAP o guía de despacho). Si access_mode es 'customer_bound', el agente de IA solo lo divulga si los customer_refs coinciden con el cliente de la conversación.",
+        "parameters": [
+          {
+            "name": "type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "externalId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "customer_refs": {
+                    "type": "object",
+                    "properties": {
+                      "phone": {
+                        "type": "string",
+                        "example": "+18095551234"
+                      },
+                      "email": {
+                        "type": "string",
+                        "example": "cliente@ejemplo.com"
+                      },
+                      "contact_id": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "payload": {
+                    "type": "object",
+                    "description": "Carga útil con los datos del registro (estado, monto, fecha, transportista, etc.)."
+                  },
+                  "access_mode": {
+                    "type": "string",
+                    "enum": [
+                      "customer_bound",
+                      "public"
+                    ],
+                    "default": "customer_bound",
+                    "description": "'customer_bound' (por defecto, restringido al cliente verificado) o 'public' (consultable por cualquier usuario)."
+                  },
+                  "external_updated_at": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Registro guardado o actualizado con éxito."
+          },
+          "401": {
+            "description": "Scope de escritura insuficiente."
+          }
+        }
+      }
+    },
+    "/knowledge": {
+      "get": {
+        "summary": "Consultar base de conocimiento",
+        "description": "Devuelve la base de conocimiento efectiva disponible para esta sucursal (sumando los artículos a nivel de workspace y los de la sucursal).",
+        "responses": {
+          "200": {
+            "description": "Colección de artículos de conocimiento activos."
+          }
+        }
+      },
+      "post": {
+        "summary": "Crear artículo de conocimiento local",
+        "description": "Registra un nuevo artículo de conocimiento con alcance exclusivo para la sucursal actual.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "title"
+                ],
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "example": "Horarios y Entregas en Festivos"
+                  },
+                  "content": {
+                    "type": "string",
+                    "example": "Durante días festivos nacionales abrimos de 9:00 a 14:00."
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "text",
+                      "faq",
+                      "policy",
+                      "url"
+                    ],
+                    "default": "text"
+                  },
+                  "language": {
+                    "type": "string",
+                    "example": "es"
+                  },
+                  "country": {
+                    "type": "string",
+                    "example": "DO"
+                  },
+                  "version": {
+                    "type": "string",
+                    "example": "1.0"
+                  },
+                  "effective_date": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "source_url": {
+                    "type": "string"
+                  },
+                  "external_ref": {
+                    "type": "string",
+                    "example": "ERP-DOC-8821"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Artículo de conocimiento creado con éxito."
+          },
+          "400": {
+            "description": "El título es obligatorio."
+          }
+        }
+      }
+    },
+    "/knowledge/{externalRef}": {
+      "put": {
+        "summary": "Sincronizar artículo por referencia externa",
+        "description": "Crea o actualiza de forma idempotente un artículo de conocimiento mediante su clave única external_ref.",
+        "parameters": [
+          {
+            "name": "externalRef",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "content": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string",
+                    "default": "text"
+                  },
+                  "language": {
+                    "type": "string"
+                  },
+                  "country": {
+                    "type": "string"
+                  },
+                  "version": {
+                    "type": "string"
+                  },
+                  "source_url": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "active",
+                      "inactive"
+                    ],
+                    "default": "active"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Artículo sincronizado exitosamente."
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Token M2M con formato 'asb_<prefijo>.<secreto>' generado desde la sección API Keys de la sucursal."
+      },
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Branch-API-Key",
+        "description": "Encabezado alternativo con la clave M2M 'asb_<prefijo>.<secreto>'."
+      }
+    }
+  }
+}
