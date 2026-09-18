@@ -156,3 +156,14 @@ El repositorio contiene el dominio y runtime integrable del módulo. La recepci�
 ## Licencia
 
 MIT
+
+
+## Contrato Maestro y Especificación de Sistema
+
+Este módulo cumple con el **Contrato Maestro de Agentes Conversacionales Multi-Tenant**:
+- Secuencia obligatoria: Saludo → Detección de Intención → Recolección de Datos → **Resolución Obligatoria de Sucursal** → Asignación de Agente → Creación de Ticket → Handoff y Silencio.
+- Memoria continua multi-turn (`activeAssignment` / `activeCase`).
+- Base de conocimiento documental para políticas, tarifas y preguntas frecuentes (.md, .txt, .pdf).
+- Guardrails deterministas en backend para evitar derivaciones o registros prematuros.
+
+Consulta la especificación técnica completa y la hoja de ruta en [docs/master-contract.md](docs/master-contract.md).
